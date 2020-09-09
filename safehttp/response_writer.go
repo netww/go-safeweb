@@ -61,6 +61,7 @@ func NotWritten() Result {
 // TODO: replace panics with proper error handling when getting the response
 // Content-Type or writing the response fails.
 func (w *ResponseWriter) Write(resp Response) Result {
+	w.markWritten()
 	ct, err := w.d.ContentType(resp)
 	if err != nil {
 		panic(err)
@@ -70,7 +71,6 @@ func (w *ResponseWriter) Write(resp Response) Result {
 	if err := w.d.Write(w.rw, resp); err != nil {
 		panic(err)
 	}
-	w.markWritten()
 	return Result{}
 }
 
@@ -82,6 +82,7 @@ func (w *ResponseWriter) Write(resp Response) Result {
 // TODO: replace panics with proper error handling when getting the response
 // Content-Type or writing the response fails.
 func (w *ResponseWriter) WriteJSON(data interface{}) Result {
+	w.markWritten()
 	resp := JSONResponse{Data: data}
 	ct, err := w.d.ContentType(resp)
 	if err != nil {
@@ -92,7 +93,6 @@ func (w *ResponseWriter) WriteJSON(data interface{}) Result {
 	if err := w.d.WriteJSON(w.rw, resp); err != nil {
 		panic(err)
 	}
-	w.markWritten()
 	return Result{}
 }
 
@@ -105,6 +105,7 @@ func (w *ResponseWriter) WriteJSON(data interface{}) Result {
 // TODO: replace panics with proper error handling when getting the response
 // Content-Type or writing the response fails.
 func (w *ResponseWriter) WriteTemplate(t Template, data interface{}) Result {
+	w.markWritten()
 	ct, err := w.d.ContentType(t)
 	if err != nil {
 		panic(err)
@@ -114,7 +115,6 @@ func (w *ResponseWriter) WriteTemplate(t Template, data interface{}) Result {
 	if err := w.d.ExecuteTemplate(w.rw, t, data); err != nil {
 		panic(err)
 	}
-	w.markWritten()
 	return Result{}
 }
 
