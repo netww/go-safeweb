@@ -15,6 +15,8 @@
 package staticheaders
 
 import (
+	"errors"
+
 	"github.com/google/go-safeweb/safehttp"
 )
 
@@ -32,4 +34,14 @@ func (Plugin) Before(w *safehttp.ResponseWriter, r *safehttp.IncomingRequest, cf
 	setXCTO([]string{"nosniff"})
 	setXXP([]string{"0"})
 	return safehttp.NotWritten()
+}
+
+// ConformanceCheck checks whether there exists a staticheaders interceptor.
+func ConformanceCheck(_ string, _ string, interceps []safehttp.ConfiguredInterceptor) error {
+	for _, ci := range interceps {
+		if _, ok := ci.Interceptor.(Plugin); ok {
+			return nil
+		}
+	}
+	return errors.New("no staticheaders interceptor found")
 }

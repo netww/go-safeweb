@@ -92,3 +92,13 @@ func (it Interceptor) Before(w *safehttp.ResponseWriter, r *safehttp.IncomingReq
 	set([]string{value.String()})
 	return safehttp.NotWritten()
 }
+
+// InterceptorCheck is a conformance check to be used with safehttp.SingleInterceptorCheck.
+func InterceptorCheck(_ string, _ string, ip safehttp.ConfiguredInterceptor) (bool, error) {
+	if _, ok := ip.Interceptor.(Interceptor); !ok {
+		return false, nil
+	}
+	// We treat the presence of the interceptor as a positive, best-effort
+	// signal. We can't really tell much more without further context.
+	return true, nil
+}

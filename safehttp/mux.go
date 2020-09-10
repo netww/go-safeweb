@@ -77,8 +77,9 @@ type ServeMux struct {
 	disp    Dispatcher
 
 	// Maps patterns to handlers supporting multiple HTTP methods.
-	handlers  map[string]methodHandler
-	interceps []Interceptor
+	handlers    map[string]methodHandler
+	interceps   []Interceptor
+	conformance []ConformanceCheck
 }
 
 // NewServeMux allocates and returns a new ServeMux
@@ -96,9 +97,9 @@ func NewServeMux(d Dispatcher, domains ...string) *ServeMux {
 	}
 }
 
-type appliedInterceptor struct {
-	it  Interceptor
-	cfg Config
+type ConfiguredInterceptor struct {
+	Interceptor Interceptor
+	Config      Config
 }
 
 // Handle registers a handler for the given pattern and method. If another
@@ -109,7 +110,7 @@ type appliedInterceptor struct {
 // Interceptor was not installed will produce no effect. If multiple Configs are
 // passed for the same Interceptor, only the first one will take effect.
 func (m *ServeMux) Handle(pattern string, method string, h Handler, cfgs ...Config) {
-	var interceps []appliedInterceptor
+	var interceps []ConfiguredInterceptor
 	for _, it := range m.interceps {
 		var cfg Config
 		for _, c := range cfgs {
@@ -118,7 +119,7 @@ func (m *ServeMux) Handle(pattern string, method string, h Handler, cfgs ...Conf
 				break
 			}
 		}
-		interceps = append(interceps, appliedInterceptor{it: it, cfg: cfg})
+		interceps = append(interceps, ConfiguredInterceptor{Interceptor: it, Config: cfg})
 	}
 	hi := handlerWithInterceptors{
 		handler:   h,
@@ -149,9 +150,23 @@ func (m *ServeMux) Install(i Interceptor) {
 	m.interceps = append(m.interceps, i)
 }
 
+// InstallConformanceChecks installs conformance checks.
+func (m *ServeMux) InstallConformanceChecks(c ...ConformanceCheck) {
+	m.conformance = append(m.conformance, c...)
+}
+
 // ServeHTTP dispatches the request to the handler whose method matches the
 // incoming request and whose pattern most closely matches the request URL.
 func (m *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	for pattern, mh := range m.handlers {
+		for method, h := range mh.handlers {
+			for _, c := range m.conformance {
+				if err := c(pattern, method, h.interceps); err != nil {
+					panic(err)
+				}
+			}
+		}
+	}
 	m.mux.ServeHTTP(w, r)
 }
 
@@ -183,7 +198,7 @@ func (m methodHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // interceptors.
 type handlerWithInterceptors struct {
 	handler   Handler
-	interceps []appliedInterceptor
+	interceps []ConfiguredInterceptor
 	disp      Dispatcher
 }
 
@@ -203,7 +218,7 @@ func (h handlerWithInterceptors) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	}()
 
 	for _, interceptor := range h.interceps {
-		interceptor.it.Before(rw, ir, interceptor.cfg)
+		interceptor.Interceptor.Before(rw, ir, interceptor.Config)
 		if rw.written {
 			return
 		}

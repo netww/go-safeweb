@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+
 	"github.com/google/go-safeweb/safehttp"
 	"golang.org/x/net/xsrftoken"
 )
@@ -130,4 +131,19 @@ func (i *Interceptor) Before(w *safehttp.ResponseWriter, r *safehttp.IncomingReq
 	tok := xsrftoken.Generate(i.SecretAppKey, cookieID.Value(), actionID)
 	r.SetContext(context.WithValue(r.Context(), tokenCtxKey{}, tok))
 	return safehttp.NotWritten()
+}
+
+// ConformanceCheck checks whether an XSRF interceptor is installed on methods
+// that don't preserve state. Others are ignored.
+func ConformanceCheck(_ string, method string, interceps []safehttp.ConfiguredInterceptor) error {
+	needsValidation := !statePreservingMethods[method]
+	if !needsValidation {
+		return nil
+	}
+	for _, ci := range interceps {
+		if _, ok := ci.Interceptor.(*Interceptor); ok {
+			return nil
+		}
+	}
+	return errors.New("no XSRF interceptor found for a method that doesn't preserve state")
 }
